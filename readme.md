@@ -15,7 +15,7 @@ Numbers in. Sorted numbers out.
 Results
 ---
 
-A neural network with two hidden layers of 25 neurons each (not including the output layer), trained for 15,000 iterations at a learning rate of 0.3, produces a training/test accuracy of about 75%/69%.
+A neural network with two hidden layers of 25 neurons each (not including the output layer), trained for 6,000 iterations at a learning rate of 0.3, produces a training/test accuracy of about 78%/74%.
 
 Running It
 ---
