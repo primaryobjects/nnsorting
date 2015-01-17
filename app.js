@@ -1,4 +1,6 @@
-var brain = require('brain');
+var dnn = require('dnn');
+var sys = require('sys');
+var stdin = process.openStdin();
 
 /*
     Neural Network Sorting Numbers
@@ -18,7 +20,7 @@ var brain = require('brain');
 */
 
 NeuralNetworkManager = {
-    net: new brain.NeuralNetwork({ hiddenLayers: [25, 25] }),
+    net: null,
 
     train: function(data, onComplete) {
         NeuralNetworkManager.run(data, onComplete, true);
@@ -29,22 +31,34 @@ NeuralNetworkManager = {
 
         // Normalize the data.
         var data = NeuralNetworkManager.normalize(data);
+        var vector = NeuralNetworkManager.getVectorArrays(data);
 
         if (isTraining) {
             // Train neural network.
+            // [25, 25, 25] @ 10,000 = 51/35 | [50, 50, 50] @ 10,000 = 67/53 | [75,75,75] @ 10,000 = 76/54
+            // [25, 25, 25] @ 20,000 = 65/43 | [50, 50, 50] @ 20,000 = 83/62 | [75,75,75] @ 20,000 = 87/69
+            // [25, 25, 25] @ 30,000 = 67/48 | [50, 50, 50] @ 30,000 = 90/71 | [75,75,75] @ 30,000 = 74/60
             console.log('Training');
-            NeuralNetworkManager.net.train(data, { errorThresh: 0.0001, iterations: 15000, learningRate: 0.3, log: true, logPeriod: 100 });
+            NeuralNetworkManager.net = new dnn.CDBN({ 'input' : vector.inputs, 'label' : vector.outputs, 'n_ins' : vector.inputs[0].length, 'n_outs' : vector.outputs[0].length, 'hidden_layer_sizes' : [50, 50, 50] });
+            NeuralNetworkManager.net.set('log level', 1);
+            NeuralNetworkManager.net.pretrain({ 'lr': 0.4, 'k': 1, 'epochs': 30000 });
+            NeuralNetworkManager.net.finetune({ 'lr': 0.4, 'epochs': 30000 });
         }
-        
+
         // Run the neural network against each row in the data and determine accuracy.
         var correct = 0;
-        for (var i in data) {
+        for (var i in vector.inputs) {
             // Get the output vector from the neural network for this row.
-            var output = NeuralNetworkManager.net.run(data[i].input);
+            var output = NeuralNetworkManager.net.predict([ vector.inputs[i] ])[0];
             // Denormalize the output back into digit form.
             var actual = NeuralNetworkManager.denormalize(output);
             // Denormalize the expected output back into digit form.
-            var expected = NeuralNetworkManager.denormalize(data[i].output);
+            var expected = NeuralNetworkManager.denormalize(vector.outputs[i]);
+
+            //console.log('Input: ' + vector.inputs[i]);
+            //console.log('Output: ' + output);
+            //console.log('Expect: ' + expected);
+            //console.log('Actual: ' + actual);
 
             // If any digit fails to match the expected output, then the neural network failed on this row.
             var failed = false;
@@ -62,6 +76,7 @@ NeuralNetworkManager = {
 
             // Save history.
             var resultItem = {};
+            resultItem.input = vector.inputs[i];
             resultItem.actual = actual;
             resultItem.expected = expected;
             resultItem.correct = !failed;
@@ -130,6 +145,10 @@ NeuralNetworkManager = {
         return result;
     },
 
+    randomFixedInteger: function (length) {
+        return Math.floor(Math.pow(10, length-1) + Math.random() * 9 * Math.pow(10, length-1));
+    },
+
     generateFormatted: function(totalCount, countPerRow, digits) {
         return NeuralNetworkManager.format(NeuralNetworkManager.generate(totalCount, countPerRow, digits));
     },
@@ -139,15 +158,6 @@ NeuralNetworkManager = {
         // Returns an array of rows with input and sorted output, in the form: [ { input: [ 987, 123 ], output: [ 123, 987 ] }, ... ]
         // totalCount: Total number of rows to generate in the set. countPerRow: Number of numbers to generate per row. For example, 3 will generate 3 numbers to sort. digits: Number of digits per number.
         var data = [];
-        var maxLimit = 8; // Math.random() will generate from 1-9 (1 to (8+1)).
-        var minLimit = 1;
-
-        // Set the Math.random() limits to generate values from.
-        for (var i=0; i<digits - 1; i++) {
-            maxLimit *= 10; // For 2-digit numbers, the maximum value is 89, since 10 to (89+10) equals 10 to 99. For 3-digit numbers, the maximum value is 899 since 100 to (899+100) equals 100 to 999.
-            maxLimit += 9;
-            minLimit *= 10; // For 2-digit numbers, the minimum value is 10. For 3-digit numbers, 100. etc.
-        }
 
         for (var i=0; i<totalCount; i++) {
             var row = {};
@@ -155,8 +165,7 @@ NeuralNetworkManager = {
             // Generate n numbers.
             var numbers = [];
             for (var j=0; j<countPerRow; j++) {
-                var number = Math.floor((Math.random() * maxLimit) + minLimit);
-                numbers.push(number);
+                numbers.push(NeuralNetworkManager.randomFixedInteger(digits));
             }
 
             // Set input numbers and sorted numbers for output.
@@ -213,15 +222,39 @@ NeuralNetworkManager = {
         }
 
         return result;
-    }
+    },
+
+    getVectorArrays: function(data) {
+        // Converts data in format [ {input: [1,6,5], output: [1,5,6]}, {input: [2,3,4], output: [2,3,4]} ] to { inputs: [ [1,6,5], [2,3,4] ], outputs: [ [1,5,6], [2,3,4] ] }.
+        var inputs = [];
+        var outputs = [];
+
+        // Go through each row in the data.
+        for (var i=0; i<data.length; i++) {
+            inputs.push(data[i].input);
+            outputs.push(data[i].output);
+        }
+        
+        return { inputs: inputs, outputs: outputs };
+    }    
 };
 
-/*
+stdin.addListener("data", function(line) {
+    // note: line is an object, and when converted to a string it will
+    // end with a linefeed.  so we (rather crudely) account for that  
+    // with toString() and then substring() 
+    line = line.toString().substring(0, line.length-1);
+
+    NeuralNetworkManager.run(JSON.parse(line), function(result) {
+        console.log(result);
+    });
+});
+
 //
 // Example generated data for 2 3-digit sorting.
 // Each digit in the 3-digit number is separated as its own input into the neural network.
 //
-var trainingData = [
+/*var trainingData = [
 {input: [1,2,3,9,8,7], output: [1,2,3,9,8,7]},
 {input: [3,2,4,1,5,6], output: [1,5,6,3,2,4]},
 {input: [9,2,1,6,7,4], output: [6,7,4,9,2,1]},
@@ -237,12 +270,11 @@ var testData = [
 {input: [5,7,6,2,1,1], output: [2,1,1,5,7,6]},
 {input: [6,7,0,9,9,2], output: [6,7,0,9,9,2]},
 {input: [8,6,7,6,5,0], output: [6,5,0,8,6,7]}
-];
-*/
+];*/
 
 // Generate training and test data.
-var trainingData = NeuralNetworkManager.generateFormatted(2000, 2, 3);
-var testData = NeuralNetworkManager.generateFormatted(2000, 2, 3);
+var trainingData = NeuralNetworkManager.generateFormatted(100, 3, 1);
+var testData = NeuralNetworkManager.generateFormatted(100, 3, 1);
 
 // Train the neural network on the training set.
 NeuralNetworkManager.train(trainingData, function(result) {

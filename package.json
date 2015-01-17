@@ -2,7 +2,7 @@
   "name": "nnsorting",
   "version": "0.0.1",
   "dependencies": {
-    "brain": "*"
+    "dnn": "*"
   },
   "engines": {
     "node": "*",
