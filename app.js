@@ -41,8 +41,8 @@ NeuralNetworkManager = {
             console.log('Training');
             NeuralNetworkManager.net = new dnn.CDBN({ 'input' : vector.inputs, 'label' : vector.outputs, 'n_ins' : vector.inputs[0].length, 'n_outs' : vector.outputs[0].length, 'hidden_layer_sizes' : [50, 50, 50] });
             NeuralNetworkManager.net.set('log level', 1);
-            NeuralNetworkManager.net.pretrain({ 'lr': 0.4, 'k': 1, 'epochs': 1 });
-            NeuralNetworkManager.net.finetune({ 'lr': 0.4, 'epochs': 1 });
+            NeuralNetworkManager.net.pretrain({ 'lr': 0.4, 'k': 1, 'epochs': 30000 });
+            NeuralNetworkManager.net.finetune({ 'lr': 0.4, 'epochs': 30000 });
         }
 
         // Run the neural network against each row in the data and determine accuracy.
