@@ -1,4 +1,6 @@
 var brain = require('brain');
+var sys = require('sys');
+var stdin = process.openStdin();
 
 /*
     Neural Network Sorting Numbers
@@ -33,7 +35,7 @@ NeuralNetworkManager = {
         if (isTraining) {
             // Train neural network.
             console.log('Training');
-            NeuralNetworkManager.net.train(data, { errorThresh: 0.0001, iterations: 15000, learningRate: 0.3, log: true, logPeriod: 100 });
+            NeuralNetworkManager.net.train(data, { errorThresh: 0.0001, iterations: 20000, learningRate: 0.3, log: true, logPeriod: 100 });
         }
         
         // Run the neural network against each row in the data and determine accuracy.
@@ -62,6 +64,7 @@ NeuralNetworkManager = {
 
             // Save history.
             var resultItem = {};
+            resultItem.input = data[i].input;
             resultItem.actual = actual;
             resultItem.expected = expected;
             resultItem.correct = !failed;
@@ -130,6 +133,10 @@ NeuralNetworkManager = {
         return result;
     },
 
+    randomFixedInteger: function (length) {
+        return Math.floor(Math.pow(10, length-1) + Math.random() * 9 * Math.pow(10, length-1));
+    },
+
     generateFormatted: function(totalCount, countPerRow, digits) {
         return NeuralNetworkManager.format(NeuralNetworkManager.generate(totalCount, countPerRow, digits));
     },
@@ -139,15 +146,6 @@ NeuralNetworkManager = {
         // Returns an array of rows with input and sorted output, in the form: [ { input: [ 987, 123 ], output: [ 123, 987 ] }, ... ]
         // totalCount: Total number of rows to generate in the set. countPerRow: Number of numbers to generate per row. For example, 3 will generate 3 numbers to sort. digits: Number of digits per number.
         var data = [];
-        var maxLimit = 8; // Math.random() will generate from 1-9 (1 to (8+1)).
-        var minLimit = 1;
-
-        // Set the Math.random() limits to generate values from.
-        for (var i=0; i<digits - 1; i++) {
-            maxLimit *= 10; // For 2-digit numbers, the maximum value is 89, since 10 to (89+10) equals 10 to 99. For 3-digit numbers, the maximum value is 899 since 100 to (899+100) equals 100 to 999.
-            maxLimit += 9;
-            minLimit *= 10; // For 2-digit numbers, the minimum value is 10. For 3-digit numbers, 100. etc.
-        }
 
         for (var i=0; i<totalCount; i++) {
             var row = {};
@@ -155,8 +153,7 @@ NeuralNetworkManager = {
             // Generate n numbers.
             var numbers = [];
             for (var j=0; j<countPerRow; j++) {
-                var number = Math.floor((Math.random() * maxLimit) + minLimit);
-                numbers.push(number);
+                numbers.push(NeuralNetworkManager.randomFixedInteger(digits));
             }
 
             // Set input numbers and sorted numbers for output.
@@ -167,6 +164,20 @@ NeuralNetworkManager = {
         }
 
         return data;
+    },
+
+    commaSeparateDigits: function(number) {
+        var formatted = '';
+
+        for (var i=0; i<number.length; i++) {
+            if (formatted.length > 0) {
+                formatted += ',';
+            }
+
+            formatted += number[i];
+        }
+
+        return formatted;
     },
 
     format: function(data) {
@@ -181,30 +192,20 @@ NeuralNetworkManager = {
 
             var formatted = '';
             for (var j=0; j<data[i].input.length; j++) {
-                var number = data[i].input[j].toString();
-
-                for (var k=0; k<number.length; k++) {
-                    if (formatted.length > 0) {
+                if (formatted.length > 0) {
                         formatted += ',';
-                    }
-
-                    formatted += number[k];
                 }
+                formatted += NeuralNetworkManager.commaSeparateDigits(data[i].input[j].toString());
             }
 
             row.input = JSON.parse('[' + formatted + ']');
 
             formatted = '';
             for (var j=0; j<data[i].output.length; j++) {
-                var number = data[i].output[j].toString();
-
-                for (var k=0; k<number.length; k++) {
-                    if (formatted.length > 0) {
+                if (formatted.length > 0) {
                         formatted += ',';
-                    }
-
-                    formatted += number[k];
                 }
+                formatted += NeuralNetworkManager.commaSeparateDigits(data[i].output[j].toString());
             }
 
             row.output = JSON.parse('[' + formatted + ']');
@@ -213,6 +214,16 @@ NeuralNetworkManager = {
         }
 
         return result;
+    },
+
+    formatInput: function(line) {
+        // Converts user input in the form 10,20,30 to [ { input: [ 10,20,30 ], output: [ 10,20,30 ] } ] and finally to [ { input: [ 1,0,2,0,3,0 ], output: [1,0,2,0,3,0 ] }].
+        var row = {};
+
+        row.input = JSON.parse('[' + line + ']');
+        row.output = row.input.slice(0).sort(function(a,b) { return a - b });
+
+        return NeuralNetworkManager.format([ row ]);
     }
 };
 
@@ -242,11 +253,29 @@ var testData = [
 
 // Generate training and test data.
 var trainingData = NeuralNetworkManager.generateFormatted(2000, 2, 3);
-var testData = NeuralNetworkManager.generateFormatted(2000, 2, 3);
+var testData = NeuralNetworkManager.generateFormatted(5000, 2, 3);
 
 // Train the neural network on the training set.
 NeuralNetworkManager.train(trainingData, function(result) {
     // Test the neural network on the cross-validation set.
     NeuralNetworkManager.run(testData, function(result) {
+        // Allow user input.
+        console.log('Enter two 3-digit numbers (example 321,145):');
+
+        stdin.addListener("data", function(line) {
+            // note: line is an object, and when converted to a string it will end with a linefeed. So we (rather crudely) account for that with toString() and then substring().
+            line = line.toString().substring(0, line.length-1);
+            
+            // Convert the input into a form readable by the neural network.
+            var input = NeuralNetworkManager.formatInput(line);
+
+            // Run the network on the input.
+            NeuralNetworkManager.run(input, function(result) {
+                var output = JSON.stringify(result[0].actual);
+                console.log('Output: ' + output.substr(1, output.length - 2));
+                console.log('');
+                console.log(result);
+            });
+        });        
     });
 });
