@@ -3,6 +3,8 @@ Neural Network Sorting Numbers
 
 This program trains a neural network to sort a set of 3-digit numbers. Did you know a neural network can sort? Neither did I, until I wrote this program!
 
+![Screenshot 1](https://raw.githubusercontent.com/primaryobjects/nnsorting/master/images/neuralnetworksorting1.png)
+
 Neural Network Setup
 ---
 
