@@ -1,7 +1,7 @@
 Neural Network Sorting Numbers
 =========
 
-This program trains a neural network to sort a set of numbers. Did you know a neural network can sort? Neither did I, until I wrote this program!
+This program trains a neural network to sort a set of numbers. Did you know that a neural network can sort? Wow.
 
 ![Screenshot 1](https://raw.githubusercontent.com/primaryobjects/nnsorting/master/images/neuralnetworksorting1.png)
 
