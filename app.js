@@ -41,8 +41,8 @@ NeuralNetworkManager = {
             console.log('Training');
             NeuralNetworkManager.net = new dnn.CDBN({ 'input' : vector.inputs, 'label' : vector.outputs, 'n_ins' : vector.inputs[0].length, 'n_outs' : vector.outputs[0].length, 'hidden_layer_sizes' : [50, 50, 50] });
             NeuralNetworkManager.net.set('log level', 1);
-            NeuralNetworkManager.net.pretrain({ 'lr': 0.4, 'k': 1, 'epochs': 30000 });
-            NeuralNetworkManager.net.finetune({ 'lr': 0.4, 'epochs': 30000 });
+            NeuralNetworkManager.net.pretrain({ 'lr': 0.4, 'k': 1, 'epochs': 1 });
+            NeuralNetworkManager.net.finetune({ 'lr': 0.4, 'epochs': 1 });
         }
 
         // Run the neural network against each row in the data and determine accuracy.
@@ -178,6 +178,20 @@ NeuralNetworkManager = {
         return data;
     },
 
+    commaSeparateDigits: function(number) {
+        var formatted = '';
+
+        for (var i=0; i<number.length; i++) {
+            if (formatted.length > 0) {
+                formatted += ',';
+            }
+
+            formatted += number[i];
+        }
+
+        return formatted;
+    },
+
     format: function(data) {
         // Converts generated data as follows:
         // [ { input: [ 987, 123 ], output: [ 123, 987 ] }, ... ]
@@ -190,30 +204,20 @@ NeuralNetworkManager = {
 
             var formatted = '';
             for (var j=0; j<data[i].input.length; j++) {
-                var number = data[i].input[j].toString();
-
-                for (var k=0; k<number.length; k++) {
-                    if (formatted.length > 0) {
+                if (formatted.length > 0) {
                         formatted += ',';
-                    }
-
-                    formatted += number[k];
                 }
+                formatted += NeuralNetworkManager.commaSeparateDigits(data[i].input[j].toString());
             }
 
             row.input = JSON.parse('[' + formatted + ']');
 
             formatted = '';
             for (var j=0; j<data[i].output.length; j++) {
-                var number = data[i].output[j].toString();
-
-                for (var k=0; k<number.length; k++) {
-                    if (formatted.length > 0) {
+                if (formatted.length > 0) {
                         formatted += ',';
-                    }
-
-                    formatted += number[k];
                 }
+                formatted += NeuralNetworkManager.commaSeparateDigits(data[i].output[j].toString());
             }
 
             row.output = JSON.parse('[' + formatted + ']');
@@ -222,6 +226,16 @@ NeuralNetworkManager = {
         }
 
         return result;
+    },
+
+    formatInput: function(line) {
+        // Converts user input in the form 10,20,30 to [ { input: [ 10,20,30 ], output: [ 10,20,30 ] } ] and finally to [ { input: [ 1,0,2,0,3,0 ], output: [1,0,2,0,3,0 ] }].
+        var row = {};
+
+        row.input = JSON.parse('[' + line + ']');
+        row.output = row.input.slice(0).sort(function(a,b) { return a - b });
+
+        return NeuralNetworkManager.format([ row ]);
     },
 
     getVectorArrays: function(data) {
@@ -236,19 +250,8 @@ NeuralNetworkManager = {
         }
         
         return { inputs: inputs, outputs: outputs };
-    }    
+    }
 };
-
-stdin.addListener("data", function(line) {
-    // note: line is an object, and when converted to a string it will
-    // end with a linefeed.  so we (rather crudely) account for that  
-    // with toString() and then substring() 
-    line = line.toString().substring(0, line.length-1);
-
-    NeuralNetworkManager.run(JSON.parse(line), function(result) {
-        console.log(result);
-    });
-});
 
 //
 // Example generated data for 2 3-digit sorting.
@@ -274,11 +277,29 @@ var testData = [
 
 // Generate training and test data.
 var trainingData = NeuralNetworkManager.generateFormatted(100, 3, 1);
-var testData = NeuralNetworkManager.generateFormatted(100, 3, 1);
+var testData = NeuralNetworkManager.generateFormatted(5000, 3, 1);
 
 // Train the neural network on the training set.
 NeuralNetworkManager.train(trainingData, function(result) {
     // Test the neural network on the cross-validation set.
     NeuralNetworkManager.run(testData, function(result) {
+        // Allow user input.
+        console.log('Enter 3 1-digit numbers (example 5,8,2):');
+
+        stdin.addListener("data", function(line) {
+            // note: line is an object, and when converted to a string it will end with a linefeed. So we (rather crudely) account for that with toString() and then substring().
+            line = line.toString().substring(0, line.length-1);
+            
+            // Convert the input into a form readable by the neural network.
+            var input = NeuralNetworkManager.formatInput(line);
+
+            // Run the network on the input.
+            NeuralNetworkManager.run(input, function(result) {
+                var output = JSON.stringify(result[0].actual);
+                console.log('Output: ' + output.substr(1, output.length - 2));
+                console.log('');
+                console.log(result);
+            });
+        });        
     });
 });
