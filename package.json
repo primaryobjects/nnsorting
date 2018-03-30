@@ -1,8 +1,8 @@
 {
   "name": "nnsorting",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "dependencies": {
-    "brain": "*"
+    "brain.js": "^1.1.2"
   },
   "engines": {
     "node": "*",

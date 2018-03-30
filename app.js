@@ -1,10 +1,9 @@
-var brain = require('brain');
-var sys = require('sys');
+var brain = require('brain.js');
 var stdin = process.openStdin();
 
 /*
     Neural Network Sorting Numbers
-    by Kory Becker 2015 http://primaryobjects.com/kory-becker
+    by Kory Becker 2018 http://primaryobjects.com/kory-becker
 
     This program trains a neural network to sort a set of 3-digit numbers. Did you know a neural network can sort? Neither did I, until I wrote this program!
 
